@@ -80,3 +80,24 @@ body {
   border-radius: 8px !important;
   color: #F1F5F9 !important;
 }
+
+/* Path Planning — dimmed unselected cards */
+.path-card-dimmed {
+  opacity: 0.45;
+  filter: grayscale(0.2);
+  transform: scale(0.98);
+  transition: all 0.5s ease;
+}
+.path-card-dimmed:hover {
+  opacity: 0.7;
+  filter: grayscale(0);
+  transform: scale(1);
+}
+
+/* Progress bar fill animation */
+@keyframes progressFill {
+  from { width: 0; }
+}
+.progress-bar-fill {
+  animation: progressFill 1.2s ease-out forwards;
+}
