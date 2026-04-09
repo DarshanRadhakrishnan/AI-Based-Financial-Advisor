@@ -83,6 +83,7 @@ export interface UserData {
         tax_efficiency: number;
         retirement_readiness: number;
       };
+      gemini_advisory?: string | null;
     };
     path_planning: {
       active_path_selected: string | null;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { UserData } from './data';
-import { Activity } from 'lucide-react';
+import { Activity, Sparkles } from 'lucide-react';
 
 interface Props {
   data: UserData;
@@ -41,29 +41,45 @@ export default function HealthScoreSection({ data, setData }: Props) {
     { name: 'Retirement Readiness', score: dims.retirement_readiness, fix: 'Increase SIP by ₹5K/month to stay on track' },
   ];
 
-  const calculateScore = () => {
+  const calculateScore = async () => {
     setIsCalculating(true);
-    // Simulate calculation — in future this calls FastAPI backend
-    setTimeout(() => {
-      setData(prev => ({
-        ...prev,
-        system_state: {
-          ...prev.system_state,
-          health_scores: {
-            overall_score: 67,
-            dimensions: {
-              emergency_fund: 40,
-              insurance_coverage: 30,
-              investment_diversification: 75,
-              debt_health: 55,
-              tax_efficiency: 60,
-              retirement_readiness: 70,
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/analyze-with-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await response.json();
+      
+      if (response.ok) {
+        setData(prev => ({
+          ...prev,
+          system_state: {
+            ...prev.system_state,
+            health_scores: {
+              overall_score: result.overall_score,
+              dimensions: {
+                emergency_fund: result.dimensions['Emergency Fund']?.score || 0,
+                insurance_coverage: result.dimensions['Insurance Coverage']?.score || 0,
+                investment_diversification: result.dimensions['Investment Diversification']?.score || 0,
+                debt_health: result.dimensions['Debt Health']?.score || 0,
+                tax_efficiency: result.dimensions['Tax Efficiency']?.score || 0,
+                retirement_readiness: result.dimensions['Retirement Readiness']?.score || 0,
+              },
+              gemini_advisory: result.gemini_advisory,
             },
           },
-        },
-      }));
+        }));
+      } else {
+        console.error("Failed to calculate score:", result);
+        alert("Failed to analyze health score. Check backend logs.");
+      }
+    } catch (error) {
+      console.error("Error connecting to backend:", error);
+      alert("Error connecting to API. Please ensure the backend is running on port 8000.");
+    } finally {
       setIsCalculating(false);
-    }, 2000);
+    }
   };
 
   if (scoreRaw === null) {
@@ -121,6 +137,22 @@ export default function HealthScoreSection({ data, setData }: Props) {
           );
         })}
       </div>
+
+      {data.system_state.health_scores.gemini_advisory && (
+        <div className="mt-8 glass rounded-xl p-6 border-l-4 border-indigo-500 animate-fadeIn">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-indigo-500/20 p-2 rounded-lg">
+              <Sparkles className="w-6 h-6 text-indigo-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-0">Gemini AI Assessment</h3>
+          </div>
+          <div className="text-slate-300 leading-relaxed space-y-4 text-left">
+            <div className="whitespace-pre-wrap font-sans">
+              {data.system_state.health_scores.gemini_advisory}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,8 @@
+# We Win — AI Financial Advisor Backend
+# Python 3.10+
+
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+httpx
