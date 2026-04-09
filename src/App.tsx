@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import {
   LayoutDashboard, Heart, BarChart3, Zap, FlaskConical,
-  Map, Bell, LogOut, TrendingUp, Menu, Folder
+  Map, Bell, LogOut, TrendingUp, Menu, Folder, User
 } from 'lucide-react';
 import { defaultUserData, UserData } from './data';
 import { supabase } from './lib/supabase';
@@ -15,9 +15,11 @@ import ScenarioSection from './ScenarioSection';
 import PathPlanningSection from './PathPlanningSection';
 import MarketAlertsSection from './MarketAlertsSection';
 import DocumentsSection from './DocumentsSection';
+import ProfileSection from './ProfileSection';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'profile', label: 'My Profile', icon: User },
   { id: 'documents', label: 'My Documents', icon: Folder },
   { id: 'health', label: 'Health Score', icon: Heart },
   { id: 'portfolio', label: 'My Portfolio', icon: BarChart3 },
@@ -35,6 +37,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [data, setData] = useState<UserData>(defaultUserData);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [docs, setDocs] = useState<{ bank: File | null, portfolio: File | null, tax: File | null, other: File | null }>({
+    bank: null,
+    portfolio: null,
+    tax: null,
+    other: null
+  });
 
   // Listen for auth state changes (handles OAuth redirects & session persistence)
   useEffect(() => {
@@ -96,8 +104,9 @@ export default function App() {
   const renderSection = () => {
     switch (activeTab) {
       case 'dashboard': return <DashboardSection data={data} setData={setData} />;
-      case 'documents': return <DocumentsSection setData={setData} onAnalysisComplete={() => setActiveTab('dashboard')} />;
-      case 'health': return <HealthScoreSection />;
+      case 'profile': return <ProfileSection data={data} setData={setData} />;
+      case 'documents': return <DocumentsSection setData={setData} onAnalysisComplete={() => setActiveTab('dashboard')} docs={docs} setDocs={setDocs} />;
+      case 'health': return <HealthScoreSection data={data} setData={setData} />;
       case 'portfolio': return <PortfolioSection data={data} />;
       case 'incident': return <IncidentSection data={data} setData={setData} />;
       case 'scenario': return <ScenarioSection data={data} setData={setData} />;

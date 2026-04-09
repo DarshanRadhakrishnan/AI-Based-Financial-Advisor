@@ -44,15 +44,22 @@ const FileUploadBox = ({ title, description, uploadedFile, onFile }: { title: st
   );
 };
 
-export default function DocumentsSection({ setData, onAnalysisComplete }: { setData: (d: UserData) => void, onAnalysisComplete: () => void }) {
-  const [docs, setDocs] = useState<{ bank: File | null, portfolio: File | null, tax: File | null }>({
-    bank: null,
-    portfolio: null,
-    tax: null
-  });
+interface DocsState { bank: File | null; portfolio: File | null; tax: File | null; other: File | null; }
+
+export default function DocumentsSection({ 
+  setData, 
+  onAnalysisComplete, 
+  docs, 
+  setDocs 
+}: { 
+  setData: (d: UserData) => void, 
+  onAnalysisComplete: () => void,
+  docs: DocsState,
+  setDocs: React.Dispatch<React.SetStateAction<DocsState>>
+}) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const handleValidFile = (file: File, type: 'bank' | 'portfolio' | 'tax') => {
+  const handleValidFile = (file: File, type: 'bank' | 'portfolio' | 'tax' | 'other') => {
     const validExts = ['.pdf', '.doc', '.docx'];
     if (validExts.some(ext => file.name.toLowerCase().endsWith(ext))) {
       setDocs(prev => ({ ...prev, [type]: file }));
@@ -63,24 +70,34 @@ export default function DocumentsSection({ setData, onAnalysisComplete }: { setD
   };
 
   const triggerAnalysis = () => {
-    if (!docs.bank || !docs.portfolio || !docs.tax) return;
+    if (!docs.bank || !docs.portfolio || !docs.tax || !docs.other) return;
     
     setIsAnalyzing(true);
     toast.success('All documents provided! Starting analysis...');
     
-    // Fake parsing logic based on all 3 filenames
-    const combinedLength = docs.bank.name.length + docs.portfolio.name.length + docs.tax.name.length;
-    const profileIndex = combinedLength % 3;
+    // Fake parsing logic based on filename matching
+    const bankName = docs.bank.name.toLowerCase();
+    let profileIndex = 0;
+    if (bankName.includes('userfile1')) profileIndex = 0;
+    else if (bankName.includes('userfile2')) profileIndex = 1;
+    else if (bankName.includes('userfile3')) profileIndex = 2;
     
     setTimeout(() => {
-      setData(fakeProfiles[profileIndex]);
+      const selectedProfile = fakeProfiles[profileIndex];
+      setData({
+        ...selectedProfile,
+        system_state: {
+          ...selectedProfile.system_state,
+          current_health_score: null
+        }
+      });
       setIsAnalyzing(false);
-      toast.success('Analysis Complete! Dashboard populated.');
+      toast.success('Analysis Complete! Documents saved.');
       onAnalysisComplete();
     }, 2000);
   };
 
-  const allUploaded = docs.bank && docs.portfolio && docs.tax;
+  const allUploaded = docs.bank && docs.portfolio && docs.tax && docs.other;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -90,7 +107,7 @@ export default function DocumentsSection({ setData, onAnalysisComplete }: { setD
           Please upload your financial documents securely. Analysis will begin automatically once all three categories are provided.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-56 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-56 mb-8">
           <FileUploadBox 
             title="Bank Statements" 
             description="Upload your recent bank statements"
@@ -109,13 +126,19 @@ export default function DocumentsSection({ setData, onAnalysisComplete }: { setD
             uploadedFile={docs.tax}
             onFile={(f) => handleValidFile(f, 'tax')} 
           />
+          <FileUploadBox 
+            title="Other Documents" 
+            description="Upload any additional proofs"
+            uploadedFile={docs.other}
+            onFile={(f) => handleValidFile(f, 'other')} 
+          />
         </div>
 
         <div className="flex flex-col items-center justify-center p-6 border-t border-white/10">
           {!allUploaded ? (
             <div className="flex items-center gap-2 text-orange-400 bg-orange-500/10 px-4 py-2 rounded-lg">
               <AlertCircle className="w-5 h-5" />
-              <span className="text-sm font-medium">Please upload all 3 documents to enable AI analysis.</span>
+              <span className="text-sm font-medium">Please upload all 4 documents to enable AI analysis.</span>
             </div>
           ) : (
             <button
