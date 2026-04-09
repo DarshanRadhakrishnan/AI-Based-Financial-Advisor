@@ -16,6 +16,7 @@ import PathPlanningSection from './PathPlanningSection';
 import MarketAlertsSection from './MarketAlertsSection';
 import DocumentsSection from './DocumentsSection';
 import ProfileSection from './ProfileSection';
+import { fetchUserData } from './lib/userDataService';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -43,43 +44,62 @@ export default function App() {
 
   // Listen for auth state changes
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      if (currentSession?.user) {
-        setUserName(currentSession.user.user_metadata?.full_name || 'User');
-        setUserEmail(currentSession.user.email || 'user@financeiq.com');
-        try {
-          // Import here to avoid circular dependency issues at the top level if they exist, or import at top
-          // Wait, I should import fetchUserData at the top.
-          const { fetchUserData } = await import('./lib/userDataService');
-          const userData = await fetchUserData(currentSession.user.id);
-          setData(userData);
-        } catch(e) {
-          console.error("Failed to fetch data on init:", e);
+    let mounted = true;
+
+    const initAuth = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (mounted) setSession(currentSession);
+        
+        if (currentSession?.user) {
+          if (mounted) {
+            setUserName(currentSession.user.user_metadata?.full_name || 'User');
+            setUserEmail(currentSession.user.email || 'user@financeiq.com');
+          }
+          
+          try {
+            const userData = await fetchUserData(currentSession.user.id);
+            if (mounted) setData(userData);
+          } catch(e) {
+            console.error("Failed to fetch data on init:", e);
+          }
         }
+      } catch (err) {
+        console.error("Auth init error:", err);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
-    });
+    };
+
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
+      if (mounted) setSession(newSession);
       if (newSession?.user) {
-        setUserName(newSession.user.user_metadata?.full_name || newSession.user.user_metadata?.name || 'User');
-        setUserEmail(newSession.user.email || 'user@financeiq.com');
+        if (mounted) {
+          setUserName(newSession.user.user_metadata?.full_name || newSession.user.user_metadata?.name || 'User');
+          setUserEmail(newSession.user.email || 'user@financeiq.com');
+        }
         try {
-          const { fetchUserData } = await import('./lib/userDataService');
           const userData = await fetchUserData(newSession.user.id);
-          setData(userData);
+          if (mounted) setData(userData);
         } catch(e) {
            console.error("Failed to fetch data on auth change:", e);
         }
       } else {
-        setData(defaultUserData);
-        setDocs({ bank: null, portfolio: null, tax: null, other: null });
+        if (mounted) {
+          setData(defaultUserData);
+          setDocs({ bank: null, portfolio: null, tax: null, other: null });
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {

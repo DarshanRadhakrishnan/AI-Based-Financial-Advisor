@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { UserData } from './data';
-import { Activity, Sparkles } from 'lucide-react';
+import { Activity, Sparkles, ChevronDown, Target, Info, AlertTriangle } from 'lucide-react';
 
 interface Props {
   data: UserData;
@@ -32,13 +32,78 @@ export default function HealthScoreSection({ data, setData }: Props) {
   const scoreRaw = data.system_state.health_scores.overall_score;
   const dims = data.system_state.health_scores.dimensions;
 
+  // --- Derived Benchmark Data ---
+  const expenses = data.income_and_cashflow.monthly_mandatory_living_expenses + data.income_and_cashflow.monthly_discretionary_spend;
+  const annualIncome = (data.income_and_cashflow.monthly_base_pay + data.income_and_cashflow.monthly_variable_pay) * 12;
+  const emergencyBenchmark = expenses * 6;
+  
+  let liquidSavings = 0;
+  data.assets_portfolio.forEach(a => {
+    if (a.liquidity_status === 'High') liquidSavings += a.current_market_value;
+    else if (a.liquidity_status === 'Medium') liquidSavings += a.current_market_value * 0.5;
+  });
+  const monthsCovered = expenses > 0 ? (liquidSavings / expenses) : 0;
+
+  const termLifeCover = data.insurance_and_protection.total_term_life_cover;
+  const healthCover = data.insurance_and_protection.total_health_insurance_cover;
+  const lifeBenchmark = annualIncome > 0 ? annualIncome * 10 : 0;
+
+  const emi = data.income_and_cashflow.total_monthly_emi;
+  const emiBenchmark = data.income_and_cashflow.monthly_net_take_home * 0.4;
+  const emiRatio = data.income_and_cashflow.monthly_net_take_home > 0 ? (emi / data.income_and_cashflow.monthly_net_take_home) * 100 : 0;
+
+  const age = data.personal_profile.current_age || 30;
+  const equityBenchmark = Math.max(20, 100 - age);
+  let equityTotal = 0, totalPortfolio = 0;
+  data.assets_portfolio.forEach(a => {
+    totalPortfolio += a.current_market_value;
+    if (a.category.toLowerCase() === 'equity') equityTotal += a.current_market_value;
+  });
+  const equityRatio = totalPortfolio > 0 ? (equityTotal / totalPortfolio) * 100 : 0;
+
+  const formatCur = (v: number) => {
+    if (v >= 10000000) return `₹${(v/10000000).toFixed(2)}Cr`;
+    if (v >= 100000) return `₹${(v/100000).toFixed(2)}L`;
+    return `₹${v.toLocaleString('en-IN')}`;
+  };
+
   const healthDimensions = [
-    { name: 'Emergency Fund', score: dims.emergency_fund, fix: 'Build 6-month expense buffer' },
-    { name: 'Insurance Coverage', score: dims.insurance_coverage, fix: 'Get term life insurance — 10x income rule' },
-    { name: 'Investment Balance', score: dims.investment_diversification, fix: 'Diversify across equity, debt, and commodities' },
-    { name: 'Debt Health', score: dims.debt_health, fix: 'Prepay highest-rate loan this quarter' },
-    { name: 'Tax Efficiency', score: dims.tax_efficiency, fix: 'Invest in NPS for 80CCD(1B) benefit' },
-    { name: 'Retirement Readiness', score: dims.retirement_readiness, fix: 'Increase SIP by ₹5K/month to stay on track' },
+    { 
+      name: 'Emergency Fund', score: dims.emergency_fund, fix: 'Build 6-month expense buffer',
+      why: 'Serves as an absolute fallback during job loss or uninsurable medical emergencies.',
+      benchmark: `6 Months Expenses (${formatCur(emergencyBenchmark)})`,
+      current: `${monthsCovered.toFixed(1)} Months (${formatCur(liquidSavings)})`
+    },
+    { 
+      name: 'Insurance Coverage', score: dims.insurance_coverage, fix: 'Get term life insurance — 10x income rule',
+      why: 'Protects dependents from financial ruin and covers large medical bills without liquidating assets.',
+      benchmark: `Life: 10x Income (${formatCur(lifeBenchmark)}), Health: ₹10L+`,
+      current: `Life: ${formatCur(termLifeCover)}, Health: ${formatCur(healthCover)}`
+    },
+    { 
+      name: 'Investment Balance', score: dims.investment_diversification, fix: 'Diversify across equity, debt, and commodities',
+      why: 'Avoids concentration risk while taking enough equity risk to beat inflation.',
+      benchmark: `~${equityBenchmark}% Equity (100 - Age Rule)`,
+      current: `${equityRatio.toFixed(0)}% Equity`
+    },
+    { 
+      name: 'Debt Health', score: dims.debt_health, fix: 'Prepay highest-rate loan this quarter',
+      why: 'High EMIs restrict cash flow needed for compounding investments.',
+      benchmark: `EMI < 40% of Take-home (${formatCur(emiBenchmark)}/mo)`,
+      current: `EMI is ${emiRatio.toFixed(0)}% (${formatCur(emi)}/mo)`
+    },
+    { 
+      name: 'Tax Efficiency', score: dims.tax_efficiency, fix: 'Invest in NPS for 80CCD(1B) benefit',
+      why: 'Reduces tax drag on your income, allowing more capital to be deployed for wealth creation.',
+      benchmark: 'Maximize 80C (1.5L), 80D (25K), NPS (50K)',
+      current: `Regime: ${data.personal_profile.tax_regime}, 80C: ₹${(data.tax_profile.section_80c_utilized/1000).toFixed(0)}K`
+    },
+    { 
+      name: 'Retirement Readiness', score: dims.retirement_readiness, fix: 'Increase SIP by ₹5K/month to stay on track',
+      why: 'Ensures you have 25x of your inflation-adjusted annual expenses by your target retirement age.',
+      benchmark: `25x Annual Expenses (Inflation Adjusted)`,
+      current: `Retirement Target: Age ${data.personal_profile.target_retirement_age || 60}`
+    },
   ];
 
   const calculateScore = async () => {
@@ -136,6 +201,51 @@ export default function HealthScoreSection({ data, setData }: Props) {
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-8 mb-6">
+        <h3 className="text-xl font-bold text-white mb-4">Detailed Benchmark Breakdown</h3>
+        <div className="space-y-4">
+          {healthDimensions.map((d, i) => {
+            const isGood = d.score >= 75;
+            const isFair = d.score >= 50 && d.score < 75;
+            return (
+              <div key={i} className="glass rounded-xl p-5 border border-white/5 hover:border-white/10 transition-colors">
+                <div className="md:flex items-start justify-between gap-6">
+                  <div className="flex-1 mb-4 md:mb-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-bold text-white text-lg">{d.name}</h4>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        isGood ? 'bg-green-500/20 text-green-400' : isFair ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        Score: {d.score}/100
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-400 mb-4">{d.why}</p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-slate-800/50 rounded-lg p-3 border border-indigo-500/20">
+                        <div className="flex items-center gap-1.5 mb-1 text-indigo-300">
+                          <Target className="w-4 h-4" />
+                          <span className="text-xs font-bold uppercase tracking-wider">Benchmark Target</span>
+                        </div>
+                        <p className="text-white text-sm font-medium">{d.benchmark}</p>
+                      </div>
+                      
+                      <div className="bg-slate-800/50 rounded-lg p-3 border border-white/5">
+                        <div className="flex items-center gap-1.5 mb-1 text-slate-400">
+                          <Info className="w-4 h-4" />
+                          <span className="text-xs font-bold uppercase tracking-wider">Your Current State</span>
+                        </div>
+                        <p className="text-white text-sm font-medium">{d.current}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {data.system_state.health_scores.gemini_advisory && (

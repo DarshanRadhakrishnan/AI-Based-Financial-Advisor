@@ -107,6 +107,20 @@ async def generate_advisory(prompt: str) -> dict:
                 json=request_body,
                 headers={"Content-Type": "application/json"},
             )
+            
+            used_model = GEMINI_MODEL
+
+            # Fallback to gemini-1.5-flash if 2.0-flash is out of free-tier quota (429)
+            if response.status_code == 429 and "quota" in response.text.lower():
+                logger.warning(f"Quota exceeded for {used_model}. Falling back to gemini-1.5-flash...")
+                used_model = "gemini-1.5-flash"
+                fallback_url = f"https://generativelanguage.googleapis.com/v1beta/models/{used_model}:generateContent"
+                response = await client.post(
+                    fallback_url,
+                    params={"key": api_key},
+                    json=request_body,
+                    headers={"Content-Type": "application/json"},
+                )
 
         if response.status_code != 200:
             error_detail = response.text[:500]
@@ -115,18 +129,17 @@ async def generate_advisory(prompt: str) -> dict:
             )
             return {
                 "advisory": None,
-                "model": GEMINI_MODEL,
+                "model": used_model,
                 "error": f"Gemini API error ({response.status_code}): {error_detail}",
             }
 
         data = response.json()
-
-        # Extract text from Gemini response
         candidates = data.get("candidates", [])
+        
         if not candidates:
             return {
                 "advisory": None,
-                "model": GEMINI_MODEL,
+                "model": used_model,
                 "error": "Gemini returned no candidates. The prompt may have been blocked.",
             }
 
@@ -137,17 +150,17 @@ async def generate_advisory(prompt: str) -> dict:
         if not advisory_text.strip():
             return {
                 "advisory": None,
-                "model": GEMINI_MODEL,
+                "model": used_model,
                 "error": "Gemini returned an empty response.",
             }
 
         logger.info(
             f"Gemini advisory generated successfully "
-            f"({len(advisory_text)} chars, model: {GEMINI_MODEL})"
+            f"({len(advisory_text)} chars, model: {used_model})"
         )
         return {
             "advisory": advisory_text.strip(),
-            "model": GEMINI_MODEL,
+            "model": used_model,
             "error": None,
         }
 
