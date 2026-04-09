@@ -125,7 +125,7 @@ export async function fetchUserData(userId: string): Promise<UserData> {
 /**
  * Save/upsert full user data to Supabase.
  */
-export async function saveUserData(data: UserData): Promise<boolean> {
+export async function saveUserData(data: UserData): Promise<{success: boolean; error?: string}> {
   try {
     console.log("Saving user_profiles...");
     // 1. Upsert user_profiles
@@ -183,13 +183,13 @@ export async function saveUserData(data: UserData): Promise<boolean> {
     // 5. Upsert system_state
     const { error: stateErr } = await supabase.from('system_state').upsert({
       user_id: data.user_id,
-      overall_health_score: data.system_state.health_scores.overall_score,
-      dim_emergency_fund: data.system_state.health_scores.dimensions.emergency_fund,
-      dim_insurance_coverage: data.system_state.health_scores.dimensions.insurance_coverage,
-      dim_investment_diversification: data.system_state.health_scores.dimensions.investment_diversification,
-      dim_debt_health: data.system_state.health_scores.dimensions.debt_health,
-      dim_tax_efficiency: data.system_state.health_scores.dimensions.tax_efficiency,
-      dim_retirement_readiness: data.system_state.health_scores.dimensions.retirement_readiness,
+      overall_health_score: data.system_state.health_scores.overall_score !== null ? Math.round(data.system_state.health_scores.overall_score) : null,
+      dim_emergency_fund: Math.round(data.system_state.health_scores.dimensions.emergency_fund || 0),
+      dim_insurance_coverage: Math.round(data.system_state.health_scores.dimensions.insurance_coverage || 0),
+      dim_investment_diversification: Math.round(data.system_state.health_scores.dimensions.investment_diversification || 0),
+      dim_debt_health: Math.round(data.system_state.health_scores.dimensions.debt_health || 0),
+      dim_tax_efficiency: Math.round(data.system_state.health_scores.dimensions.tax_efficiency || 0),
+      dim_retirement_readiness: Math.round(data.system_state.health_scores.dimensions.retirement_readiness || 0),
       health_last_calculated: new Date().toISOString(),
       active_path_selected: data.system_state.path_planning.active_path_selected,
       projected_fire_date: data.system_state.path_planning.projected_fire_date,
@@ -219,9 +219,9 @@ export async function saveUserData(data: UserData): Promise<boolean> {
     }
 
     console.log("All saved successfully!");
-    return true;
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('Error saving user data:', err);
-    return false;
+    return { success: false, error: err.message || JSON.stringify(err) || "Unknown database error" };
   }
 }

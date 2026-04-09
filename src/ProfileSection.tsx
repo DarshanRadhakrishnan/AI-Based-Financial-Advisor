@@ -92,13 +92,13 @@ export default function ProfileSection({ data, setData }: { data: UserData; setD
 
   const handleSave = async () => {
     setSaving(true);
-    const success = await saveUserData(data);
+    const result = await saveUserData(data);
     setSaving(false);
-    if (success) {
+    if (result.success) {
       setSaved(true);
       toast.success('Profile saved to database!');
     } else {
-      toast.error('Failed to save profile. Please try again.');
+      toast.error(`Save Failed: ${result.error}`);
     }
   };
 

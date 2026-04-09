@@ -38,9 +38,11 @@ from models import (
     HealthScoreResponse,
     DimensionScoreResponse,
     GeminiAdvisoryResponse,
+    ChatRequest,
+    ChatResponse,
 )
 from scoring_engine import run_health_score_from_json
-from gemini_service import generate_advisory
+from gemini_service import generate_advisory, generate_chat_response
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION
@@ -280,6 +282,34 @@ async def analyze_with_ai(payload: HealthScoreRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal error: {str(e)}",
+        )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT 3: CHATBOT INTERACTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post(
+    "/api/v1/chat",
+    response_model=ChatResponse,
+    tags=["Chat"],
+    summary="Chat with AI Financial Advisor",
+    description=("Answers basic queries and politely declines advanced queries."),
+)
+async def chat_interaction(payload: ChatRequest):
+    try:
+        logger.info(f"[chat] Received query: {payload.query[:50]}...")
+        result = await generate_chat_response(payload.query)
+        if result.get("error"):
+            logger.error(f"[chat] Error from Gemini: {result['error']}")
+        return ChatResponse(
+            response=result["response"],
+            error=result["error"]
+        )
+    except Exception as e:
+        logger.error(f"[chat] Unexpected error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Chat error: {str(e)}",
         )
 
 

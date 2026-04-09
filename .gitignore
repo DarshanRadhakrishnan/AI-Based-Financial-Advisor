@@ -25,3 +25,5 @@ dist-ssr
 # Allow env files (do NOT ignore them)
 !.env
 !.env.*
+__pycache__/
+*.pyc
