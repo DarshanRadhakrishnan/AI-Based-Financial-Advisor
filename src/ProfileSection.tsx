@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Save, User, Briefcase, DollarSign, Shield, CheckCircle } from 'lucide-react';
-import { UserData, formatINR } from './data';
+import { Save, User, Briefcase, DollarSign, Shield, CheckCircle, Target, Trash2, Plus } from 'lucide-react';
+import { UserData, formatINR, GoalItem } from './data';
 import { saveUserData } from './lib/userDataService';
 import toast from 'react-hot-toast';
 
@@ -55,6 +55,38 @@ export default function ProfileSection({ data, setData }: { data: UserData; setD
       ...prev,
       tax_profile: { ...prev.tax_profile, [field]: value },
     }));
+    setSaved(false);
+  };
+
+  const addGoal = () => {
+    if (data.financial_goals.length >= 5) return;
+    const newGoal: GoalItem = {
+      goal_id: `g_${Date.now()}`,
+      goal_name: '',
+      target_amount: 0,
+      target_year: new Date().getFullYear(),
+      priority: 'Medium',
+      status: 'Not Started',
+    };
+    setData(prev => ({ ...prev, financial_goals: [...prev.financial_goals, newGoal] }));
+    setSaved(false);
+  };
+
+  const updateGoal = (index: number, field: keyof GoalItem, value: any) => {
+    setData(prev => {
+      const newGoals = [...prev.financial_goals];
+      newGoals[index] = { ...newGoals[index], [field]: value };
+      return { ...prev, financial_goals: newGoals };
+    });
+    setSaved(false);
+  };
+
+  const removeGoal = (index: number) => {
+    setData(prev => {
+      const newGoals = [...prev.financial_goals];
+      newGoals.splice(index, 1);
+      return { ...prev, financial_goals: newGoals };
+    });
     setSaved(false);
   };
 
@@ -259,6 +291,64 @@ export default function ProfileSection({ data, setData }: { data: UserData; setD
             </div>
           </div>
         </SectionCard>
+
+        {/* Financial Goals (Spans both columns) */}
+        <div className="col-span-1 lg:col-span-2">
+          <SectionCard title="Financial Goals" icon={Target}>
+            <div className="space-y-4">
+              {data.financial_goals.map((goal, index) => (
+                <div key={goal.goal_id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 rounded-xl border border-white/5" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="md:col-span-3">
+                    <label className={labelCls}>Goal Name</label>
+                    <select value={goal.goal_name} onChange={e => updateGoal(index, 'goal_name', e.target.value)}
+                      className={inputCls + ' cursor-pointer'} style={{ background: 'rgba(11,29,58,1)' }}>
+                      <option value="">Select Goal...</option>
+                      <option value="Emergency Fund">Emergency Fund</option>
+                      <option value="House Downpayment">House Downpayment</option>
+                      <option value="Education">Education</option>
+                      <option value="Retirement Corpus">Retirement Corpus</option>
+                      <option value="Wedding">Wedding</option>
+                      <option value="Travel">Travel</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className={labelCls}>Target Amount (₹)</label>
+                    <input type="number" value={goal.target_amount || ''} onChange={e => updateGoal(index, 'target_amount', Number(e.target.value))}
+                      className={inputCls} style={inputStyle} placeholder="100000" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className={labelCls}>Target Year</label>
+                    <input type="number" value={goal.target_year || ''} onChange={e => updateGoal(index, 'target_year', Number(e.target.value))}
+                      className={inputCls} style={inputStyle} placeholder={new Date().getFullYear().toString()} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className={labelCls}>Priority</label>
+                    <select value={goal.priority} onChange={e => updateGoal(index, 'priority', e.target.value)}
+                      className={inputCls + ' cursor-pointer'} style={{ background: 'rgba(11,29,58,1)' }}>
+                      <option value="Critical">Critical</option>
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-1 flex items-end justify-center md:pb-1">
+                    <button onClick={() => removeGoal(index)} title="Remove Goal"
+                      className="p-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all cursor-pointer">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              
+              {data.financial_goals.length < 5 && (
+                <button onClick={addGoal}
+                  className="w-full py-3 rounded-xl border border-dashed border-white/20 text-slate-300 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all flex items-center justify-center gap-2 cursor-pointer font-medium text-sm">
+                  <Plus className="w-4 h-4" /> Add Goal ({data.financial_goals.length}/5)
+                </button>
+              )}
+            </div>
+          </SectionCard>
+        </div>
       </div>
     </div>
   );

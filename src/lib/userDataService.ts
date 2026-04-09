@@ -198,6 +198,26 @@ export async function saveUserData(data: UserData): Promise<boolean> {
     }, { onConflict: 'user_id' }).select();
     if (stateErr) throw stateErr;
 
+    console.log("Saving financial goals...");
+    // 6. Delete old goals & insert new ones
+    const { error: delGoalsErr } = await supabase.from('financial_goals').delete().eq('user_id', data.user_id);
+    if (delGoalsErr) throw delGoalsErr;
+
+    if (data.financial_goals.length > 0) {
+      const { error: insGoalsErr } = await supabase.from('financial_goals').insert(
+        data.financial_goals.map(g => ({
+          goal_id: g.goal_id,
+          user_id: data.user_id,
+          goal_name: g.goal_name,
+          target_amount: g.target_amount,
+          target_year: g.target_year,
+          priority: g.priority,
+          status: g.status,
+        }))
+      );
+      if (insGoalsErr) throw insGoalsErr;
+    }
+
     console.log("All saved successfully!");
     return true;
   } catch (err) {
