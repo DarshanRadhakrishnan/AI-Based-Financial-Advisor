@@ -200,3 +200,11 @@ class GeminiAdvisoryResponse(BaseModel):
     gemini_advisory: Optional[str] = None
     gemini_model: Optional[str] = None
     gemini_error: Optional[str] = None
+
+
+class ChatRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=1000)
+
+class ChatResponse(BaseModel):
+    response: str
+    error: Optional[str] = None

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_API_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent"
@@ -110,17 +110,8 @@ async def generate_advisory(prompt: str) -> dict:
             
             used_model = GEMINI_MODEL
 
-            # Fallback to gemini-1.5-flash if 2.0-flash is out of free-tier quota (429)
             if response.status_code == 429 and "quota" in response.text.lower():
-                logger.warning(f"Quota exceeded for {used_model}. Falling back to gemini-1.5-flash...")
-                used_model = "gemini-1.5-flash"
-                fallback_url = f"https://generativelanguage.googleapis.com/v1beta/models/{used_model}:generateContent"
-                response = await client.post(
-                    fallback_url,
-                    params={"key": api_key},
-                    json=request_body,
-                    headers={"Content-Type": "application/json"},
-                )
+                logger.warning(f"Quota exceeded for {used_model}. Please check your billing settings or API key limits.")
 
         if response.status_code != 200:
             error_detail = response.text[:500]
@@ -177,4 +168,81 @@ async def generate_advisory(prompt: str) -> dict:
             "advisory": None,
             "model": GEMINI_MODEL,
             "error": f"Unexpected error: {str(e)}",
+        }
+
+async def generate_chat_response(query: str) -> dict:
+    """
+    Sends a user query to Gemini for the chatbot.
+    """
+    api_key = _get_api_key()
+
+    if not api_key:
+        return {
+            "response": "GEMINI_API_KEY not configured.",
+            "error": "Missing key"
+        }
+
+    system_prompt = (
+        "You are a helpful and polite financial assistant for the 'We Win' AI Financial Advisor system. "
+        "You ONLY answer the user queries about the system and basic doubts in finance effectively. "
+        "Do NOT answer advanced queries. If a user asks an advanced query, politely and smoothly say a no."
+    )
+
+    request_body = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": f"System Context: {system_prompt}\n\nUser Query: {query}"}
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.5,
+            "maxOutputTokens": 1024,
+        }
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                GEMINI_API_URL,
+                params={"key": api_key},
+                json=request_body,
+                headers={"Content-Type": "application/json"},
+            )
+            
+            used_model = GEMINI_MODEL
+
+            if response.status_code == 429 and "quota" in response.text.lower():
+                logger.warning(f"Quota exceeded for {used_model}.")
+
+        if response.status_code != 200:
+            return {
+                "response": "Sorry, I am currently unavailable. Please try again later.",
+                "error": f"API error ({response.status_code}): {response.text[:500]}",
+            }
+
+        data = response.json()
+        candidates = data.get("candidates", [])
+        
+        if not candidates:
+            return {
+                "response": "I'm sorry, I couldn't generate a response for that.",
+                "error": "No candidates",
+            }
+
+        content = candidates[0].get("content", {})
+        parts = content.get("parts", [])
+        response_text = "".join(part.get("text", "") for part in parts)
+
+        return {
+            "response": response_text.strip(),
+            "error": None,
+        }
+
+    except Exception as e:
+        logger.error(f"Chat API error: {e}")
+        return {
+            "response": "Sorry, I encountered an error. Please try again later.",
+            "error": str(e),
         }

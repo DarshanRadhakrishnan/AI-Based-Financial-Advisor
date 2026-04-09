@@ -16,6 +16,7 @@ import PathPlanningSection from './PathPlanningSection';
 import MarketAlertsSection from './MarketAlertsSection';
 import DocumentsSection from './DocumentsSection';
 import ProfileSection from './ProfileSection';
+import Chatbot from './Chatbot';
 import { fetchUserData } from './lib/userDataService';
 
 const navItems = [
@@ -226,6 +227,7 @@ export default function App() {
           {renderSection()}
         </div>
       </main>
+      <Chatbot />
     </div>
   );
 }
