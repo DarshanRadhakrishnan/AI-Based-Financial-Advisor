@@ -13,8 +13,9 @@ interface SimResult {
 }
 
 function simulate(data: UserData, type: string, amount: number): SimResult {
-  const surplus = data.monthly_cash_flow.net_take_home_income - data.monthly_cash_flow.mandatory_living_expenses -
-    data.monthly_cash_flow.total_emi_payments - data.monthly_cash_flow.current_active_sips;
+  const ic = data.income_and_cashflow;
+  const surplus = ic.monthly_net_take_home - ic.monthly_mandatory_living_expenses -
+    ic.total_monthly_emi - ic.total_active_monthly_sips;
   let afterSurplus = surplus, retireDelta = 0, scoreDelta = 0;
   let afterCorpus = '₹2.8 Cr';
 
@@ -37,16 +38,18 @@ function simulate(data: UserData, type: string, amount: number): SimResult {
     afterCorpus = '₹3.6 Cr';
   }
 
+  const currentScore = data.system_state.health_scores.overall_score || 67;
+
   return {
     currentSurplus: surplus, afterSurplus,
-    currentRetire: data.personal_info.target_retirement_age,
-    afterRetire: data.personal_info.target_retirement_age + retireDelta,
-    currentScore: 67, afterScore: 67 + scoreDelta,
+    currentRetire: data.personal_profile.target_retirement_age,
+    afterRetire: data.personal_profile.target_retirement_age + retireDelta,
+    currentScore, afterScore: currentScore + scoreDelta,
     currentCorpus: '₹2.8 Cr', afterCorpus,
   };
 }
 
-export default function ScenarioSection({ data, setData }: { data: UserData; setData: (d: UserData) => void }) {
+export default function ScenarioSection({ data, setData }: { data: UserData; setData: React.Dispatch<React.SetStateAction<UserData>> }) {
   const [name, setName] = useState('');
   const [type, setType] = useState(scenarioTypes[0]);
   const [amount, setAmount] = useState('');
@@ -58,8 +61,19 @@ export default function ScenarioSection({ data, setData }: { data: UserData; set
   };
 
   const applyToIncident = () => {
-    const newEvent = { event: `Scenario: ${name || type}`, timestamp: new Date().toISOString(), amount: Number(amount) || 0 };
-    setData({ ...data, system_state: { ...data.system_state, logged_events: [...data.system_state.logged_events, newEvent] } });
+    const newEvent = {
+      event_id: `evt_sim_${Date.now()}`,
+      event_type: `Scenario: ${name || type}`,
+      timestamp: new Date().toISOString(),
+      impact_summary: `Amount: ₹${Number(amount) || 0}`,
+    };
+    setData(prev => ({
+      ...prev,
+      system_state: {
+        ...prev.system_state,
+        event_ledger: [...prev.system_state.event_ledger, newEvent],
+      },
+    }));
     toast.success('Scenario applied to Incident Layer');
   };
 

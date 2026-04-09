@@ -4,11 +4,17 @@ import toast from 'react-hot-toast';
 
 const pathIcons = [Shield, BarChart3, Flame];
 
-export default function PathPlanningSection({ data, setData }: { data: UserData; setData: (d: UserData) => void }) {
-  const selected = data.system_state.active_path_selected;
+export default function PathPlanningSection({ data, setData }: { data: UserData; setData: React.Dispatch<React.SetStateAction<UserData>> }) {
+  const selected = data.system_state.path_planning.active_path_selected;
 
   const selectPath = (id: string) => {
-    setData({ ...data, system_state: { ...data.system_state, active_path_selected: id } });
+    setData(prev => ({
+      ...prev,
+      system_state: {
+        ...prev.system_state,
+        path_planning: { ...prev.system_state.path_planning, active_path_selected: id },
+      },
+    }));
     toast.success('Path selected! Your plan is now active.');
   };
 

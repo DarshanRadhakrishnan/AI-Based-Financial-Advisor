@@ -3,17 +3,25 @@ import { X, Clock } from 'lucide-react';
 import { incidentEvents, formatINR, UserData } from './data';
 import toast from 'react-hot-toast';
 
-export default function IncidentSection({ data, setData }: { data: UserData; setData: (d: UserData) => void }) {
+export default function IncidentSection({ data, setData }: { data: UserData; setData: React.Dispatch<React.SetStateAction<UserData>> }) {
   const [modal, setModal] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
 
   const handleApply = () => {
     if (!modal) return;
-    const newEvent = { event: modal, timestamp: new Date().toISOString(), amount: Number(amount) || 0 };
-    setData({
-      ...data,
-      system_state: { ...data.system_state, logged_events: [...data.system_state.logged_events, newEvent] },
-    });
+    const newEvent = {
+      event_id: `evt_${Date.now()}`,
+      event_type: modal,
+      timestamp: new Date().toISOString(),
+      impact_summary: `${modal} — Amount: ₹${Number(amount) || 0}`,
+    };
+    setData(prev => ({
+      ...prev,
+      system_state: {
+        ...prev.system_state,
+        event_ledger: [...prev.system_state.event_ledger, newEvent],
+      },
+    }));
     toast.success('Life event logged. Your paths will be recalculated.');
     setModal(null);
     setAmount('');
@@ -38,18 +46,18 @@ export default function IncidentSection({ data, setData }: { data: UserData; set
       {/* Logged Events */}
       <div className="glass rounded-xl p-6">
         <h3 className="text-lg font-semibold text-white mb-4">Logged Events</h3>
-        {data.system_state.logged_events.length === 0 ? (
+        {data.system_state.event_ledger.length === 0 ? (
           <p className="text-sm text-slate-500 text-center py-8">No events logged yet. Click an event above to get started.</p>
         ) : (
           <div className="space-y-3">
-            {data.system_state.logged_events.map((ev, i) => (
+            {data.system_state.event_ledger.map((ev, i) => (
               <div key={i} className="flex items-center gap-4 p-3 rounded-lg bg-white/[0.03] border border-white/5">
                 <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0"></div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{ev.event}</p>
+                  <p className="text-sm font-medium text-white">{ev.event_type}</p>
                   <div className="flex gap-3 text-xs text-slate-400 mt-0.5">
                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(ev.timestamp).toLocaleString()}</span>
-                    {ev.amount > 0 && <span>{formatINR(ev.amount)}</span>}
+                    {ev.impact_summary && <span>{ev.impact_summary}</span>}
                   </div>
                 </div>
               </div>

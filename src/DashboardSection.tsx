@@ -1,10 +1,8 @@
-import { useRef, useState } from 'react';
-import { DollarSign, CreditCard, TrendingUp, ArrowDownCircle, Upload, CheckCircle } from 'lucide-react';
+import { DollarSign, CreditCard, TrendingUp, ArrowDownCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatINR, UserData, fakeProfiles } from './data';
-import toast from 'react-hot-toast';
+import { formatINR, UserData } from './data';
 
-const COLORS = ['#F97316', '#0EA5E9', '#22C55E'];
+const COLORS = ['#F97316', '#0EA5E9', '#22C55E', '#A855F7'];
 
 const priorityBadge = (p: string) => {
   if (p === 'Critical') return 'bg-red-500/20 text-red-400';
@@ -17,26 +15,21 @@ const statusBadge = (s: string) => {
   return 'bg-slate-500/20 text-slate-400';
 };
 
-
-
-export default function DashboardSection({ data, setData }: { data: UserData; setData: (d: UserData) => void }) {
-  const cf = data.monthly_cash_flow;
+export default function DashboardSection({ data, setData }: { data: UserData; setData: React.Dispatch<React.SetStateAction<UserData>> }) {
+  const cf = data.income_and_cashflow;
 
   const stats = [
-    { label: 'Monthly Income', value: formatINR(cf.net_take_home_income), icon: DollarSign, color: 'from-green-500 to-emerald-600' },
-    { label: 'Monthly Expenses', value: formatINR(cf.mandatory_living_expenses), icon: ArrowDownCircle, color: 'from-red-500 to-rose-600' },
-    { label: 'Total EMI', value: formatINR(cf.total_emi_payments), icon: CreditCard, color: 'from-blue-500 to-cyan-600' },
-    { label: 'Active SIPs', value: formatINR(cf.current_active_sips), icon: TrendingUp, color: 'from-orange-500 to-amber-600' },
+    { label: 'Monthly Income', value: formatINR(cf.monthly_net_take_home), icon: DollarSign, color: 'from-green-500 to-emerald-600' },
+    { label: 'Monthly Expenses', value: formatINR(cf.monthly_mandatory_living_expenses), icon: ArrowDownCircle, color: 'from-red-500 to-rose-600' },
+    { label: 'Total EMI', value: formatINR(cf.total_monthly_emi), icon: CreditCard, color: 'from-blue-500 to-cyan-600' },
+    { label: 'Active SIPs', value: formatINR(cf.total_active_monthly_sips), icon: TrendingUp, color: 'from-orange-500 to-amber-600' },
   ];
 
-  const totalPortfolio = data.assets_portfolio.reduce((s, a) => s + a.current_value, 0);
-  const pieData = data.assets_portfolio.map(a => ({ name: a.category, value: a.current_value }));
+  const totalPortfolio = data.assets_portfolio.reduce((s, a) => s + a.current_market_value, 0);
   // Merge by category
   const merged: Record<string, number> = {};
-  data.assets_portfolio.forEach(a => { merged[a.category] = (merged[a.category] || 0) + a.current_value; });
+  data.assets_portfolio.forEach(a => { merged[a.category] = (merged[a.category] || 0) + a.current_market_value; });
   const mergedPie = Object.entries(merged).map(([name, value]) => ({ name, value }));
-
-
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -129,8 +122,6 @@ export default function DashboardSection({ data, setData }: { data: UserData; se
           </div>
         </div>
       </div>
-
-
     </div>
   );
 }

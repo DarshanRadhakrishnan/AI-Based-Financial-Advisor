@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Upload, CheckCircle, FileText, AlertCircle } from 'lucide-react';
-import { UserData, fakeProfiles } from './data';
+import { UserData } from './data';
 import toast from 'react-hot-toast';
 
 const FileUploadBox = ({ title, description, uploadedFile, onFile }: { title: string, description: string, uploadedFile: File | null, onFile: (f: File) => void }) => {
@@ -52,13 +52,11 @@ export default function DocumentsSection({
   docs, 
   setDocs 
 }: { 
-  setData: (d: UserData) => void, 
+  setData: React.Dispatch<React.SetStateAction<UserData>>, 
   onAnalysisComplete: () => void,
   docs: DocsState,
   setDocs: React.Dispatch<React.SetStateAction<DocsState>>
 }) {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-
   const handleValidFile = (file: File, type: 'bank' | 'portfolio' | 'tax' | 'other') => {
     const validExts = ['.pdf', '.doc', '.docx'];
     if (validExts.some(ext => file.name.toLowerCase().endsWith(ext))) {
@@ -67,34 +65,6 @@ export default function DocumentsSection({
     } else {
       toast.error('Invalid file format — please upload a PDF or DOC file');
     }
-  };
-
-  const triggerAnalysis = () => {
-    if (!docs.bank || !docs.portfolio || !docs.tax || !docs.other) return;
-    
-    setIsAnalyzing(true);
-    toast.success('All documents provided! Starting analysis...');
-    
-    // Fake parsing logic based on filename matching
-    const bankName = docs.bank.name.toLowerCase();
-    let profileIndex = 0;
-    if (bankName.includes('userfile1')) profileIndex = 0;
-    else if (bankName.includes('userfile2')) profileIndex = 1;
-    else if (bankName.includes('userfile3')) profileIndex = 2;
-    
-    setTimeout(() => {
-      const selectedProfile = fakeProfiles[profileIndex];
-      setData({
-        ...selectedProfile,
-        system_state: {
-          ...selectedProfile.system_state,
-          current_health_score: null
-        }
-      });
-      setIsAnalyzing(false);
-      toast.success('Analysis Complete! Documents saved.');
-      onAnalysisComplete();
-    }, 2000);
   };
 
   const allUploaded = docs.bank && docs.portfolio && docs.tax && docs.other;
@@ -138,20 +108,13 @@ export default function DocumentsSection({
           {!allUploaded ? (
             <div className="flex items-center gap-2 text-orange-400 bg-orange-500/10 px-4 py-2 rounded-lg">
               <AlertCircle className="w-5 h-5" />
-              <span className="text-sm font-medium">Please upload all 4 documents to enable AI analysis.</span>
+              <span className="text-sm font-medium">Please upload all 4 documents to complete your profile.</span>
             </div>
           ) : (
-            <button
-              onClick={triggerAnalysis}
-              disabled={isAnalyzing}
-              className={`px-8 py-3 rounded-lg font-medium text-white shadow-lg transition-all ${
-                isAnalyzing 
-                  ? 'bg-orange-500/50 cursor-not-allowed animate-pulse' 
-                  : 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 cursor-pointer hover:shadow-orange-500/25'
-              }`}
-            >
-              {isAnalyzing ? 'Analyzing Documents...' : 'Start AI Analysis'}
-            </button>
+            <div className="flex items-center gap-2 text-green-400 bg-green-500/10 px-4 py-2 rounded-lg">
+              <CheckCircle className="w-5 h-5" />
+              <span className="text-sm font-medium">All documents have been securely uploaded.</span>
+            </div>
           )}
         </div>
       </div>

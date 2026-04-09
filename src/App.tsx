@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import {
   LayoutDashboard, Heart, BarChart3, Zap, FlaskConical,
-  Map, Bell, LogOut, TrendingUp, Menu, Folder, User
+  Map, Bell, LogOut, TrendingUp, Menu, Folder, UserCircle
 } from 'lucide-react';
 import { defaultUserData, UserData } from './data';
 import { supabase } from './lib/supabase';
@@ -19,8 +19,8 @@ import ProfileSection from './ProfileSection';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'profile', label: 'My Profile', icon: User },
   { id: 'documents', label: 'My Documents', icon: Folder },
+  { id: 'profile', label: 'My Profile', icon: UserCircle },
   { id: 'health', label: 'Health Score', icon: Heart },
   { id: 'portfolio', label: 'My Portfolio', icon: BarChart3 },
   { id: 'incident', label: 'Incident Layer', icon: Zap },
@@ -28,6 +28,8 @@ const navItems = [
   { id: 'paths', label: 'Path Planning', icon: Map },
   { id: 'alerts', label: 'Market Alerts', icon: Bell },
 ];
+
+interface DocsState { bank: File | null; portfolio: File | null; tax: File | null; other: File | null; }
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -37,31 +39,43 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [data, setData] = useState<UserData>(defaultUserData);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [docs, setDocs] = useState<{ bank: File | null, portfolio: File | null, tax: File | null, other: File | null }>({
-    bank: null,
-    portfolio: null,
-    tax: null,
-    other: null
-  });
+  const [docs, setDocs] = useState<DocsState>({ bank: null, portfolio: null, tax: null, other: null });
 
-  // Listen for auth state changes (handles OAuth redirects & session persistence)
+  // Listen for auth state changes
   useEffect(() => {
-    // Get the current session on mount
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
       setSession(currentSession);
       if (currentSession?.user) {
         setUserName(currentSession.user.user_metadata?.full_name || 'User');
         setUserEmail(currentSession.user.email || 'user@financeiq.com');
+        try {
+          // Import here to avoid circular dependency issues at the top level if they exist, or import at top
+          // Wait, I should import fetchUserData at the top.
+          const { fetchUserData } = await import('./lib/userDataService');
+          const userData = await fetchUserData(currentSession.user.id);
+          setData(userData);
+        } catch(e) {
+          console.error("Failed to fetch data on init:", e);
+        }
       }
       setLoading(false);
     });
 
-    // Subscribe to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession);
       if (newSession?.user) {
         setUserName(newSession.user.user_metadata?.full_name || newSession.user.user_metadata?.name || 'User');
         setUserEmail(newSession.user.email || 'user@financeiq.com');
+        try {
+          const { fetchUserData } = await import('./lib/userDataService');
+          const userData = await fetchUserData(newSession.user.id);
+          setData(userData);
+        } catch(e) {
+           console.error("Failed to fetch data on auth change:", e);
+        }
+      } else {
+        setData(defaultUserData);
+        setDocs({ bank: null, portfolio: null, tax: null, other: null });
       }
     });
 
@@ -72,15 +86,16 @@ export default function App() {
     await supabase.auth.signOut();
     setSession(null);
     setActiveTab('dashboard');
+    setData(defaultUserData);
+    setDocs({ bank: null, portfolio: null, tax: null, other: null });
   };
 
   const handleLogin = (name: string, email: string) => {
     setUserName(name);
     setUserEmail(email);
-    // Session will be picked up by onAuthStateChange
   };
 
-  // Loading spinner while checking session
+  // Loading spinner
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0F172A' }}>
@@ -104,8 +119,8 @@ export default function App() {
   const renderSection = () => {
     switch (activeTab) {
       case 'dashboard': return <DashboardSection data={data} setData={setData} />;
-      case 'profile': return <ProfileSection data={data} setData={setData} />;
       case 'documents': return <DocumentsSection setData={setData} onAnalysisComplete={() => setActiveTab('dashboard')} docs={docs} setDocs={setDocs} />;
+      case 'profile': return <ProfileSection data={data} setData={setData} />;
       case 'health': return <HealthScoreSection data={data} setData={setData} />;
       case 'portfolio': return <PortfolioSection data={data} />;
       case 'incident': return <IncidentSection data={data} setData={setData} />;
@@ -120,15 +135,12 @@ export default function App() {
     <div className="flex min-h-screen" style={{ background: '#0F172A' }}>
       <Toaster position="top-right" toastOptions={{ className: 'toast-custom', duration: 3000 }} />
 
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ background: '#0B1D3A' }}>
-        {/* Logo */}
         <div className="p-5 border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg">
@@ -138,7 +150,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map(item => {
             const active = activeTab === item.id;
@@ -158,7 +169,6 @@ export default function App() {
           })}
         </nav>
 
-        {/* User */}
         <div className="p-4 border-t border-white/5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
@@ -175,9 +185,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 min-w-0">
-        {/* Mobile header */}
         <div className="lg:hidden flex items-center gap-3 p-4 border-b border-white/5" style={{ background: '#0B1D3A' }}>
           <button onClick={() => setSidebarOpen(true)} className="text-white cursor-pointer">
             <Menu className="w-5 h-5" />
@@ -186,7 +194,6 @@ export default function App() {
         </div>
 
         <div className="p-4 lg:p-8 max-w-7xl mx-auto">
-          {/* Page title */}
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-white">
               {navItems.find(n => n.id === activeTab)?.label || 'Dashboard'}

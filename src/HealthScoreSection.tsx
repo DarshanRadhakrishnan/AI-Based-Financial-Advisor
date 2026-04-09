@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { healthDimensions, UserData } from './data';
+import { UserData } from './data';
 import { Activity } from 'lucide-react';
 
 interface Props {
@@ -29,17 +29,38 @@ function CircularGauge({ score }: { score: number }) {
 
 export default function HealthScoreSection({ data, setData }: Props) {
   const [isCalculating, setIsCalculating] = useState(false);
-  const scoreRaw = data.system_state.current_health_score;
+  const scoreRaw = data.system_state.health_scores.overall_score;
+  const dims = data.system_state.health_scores.dimensions;
+
+  const healthDimensions = [
+    { name: 'Emergency Fund', score: dims.emergency_fund, fix: 'Build 6-month expense buffer' },
+    { name: 'Insurance Coverage', score: dims.insurance_coverage, fix: 'Get term life insurance — 10x income rule' },
+    { name: 'Investment Balance', score: dims.investment_diversification, fix: 'Diversify across equity, debt, and commodities' },
+    { name: 'Debt Health', score: dims.debt_health, fix: 'Prepay highest-rate loan this quarter' },
+    { name: 'Tax Efficiency', score: dims.tax_efficiency, fix: 'Invest in NPS for 80CCD(1B) benefit' },
+    { name: 'Retirement Readiness', score: dims.retirement_readiness, fix: 'Increase SIP by ₹5K/month to stay on track' },
+  ];
 
   const calculateScore = () => {
     setIsCalculating(true);
+    // Simulate calculation — in future this calls FastAPI backend
     setTimeout(() => {
       setData(prev => ({
         ...prev,
         system_state: {
           ...prev.system_state,
-          current_health_score: 67
-        }
+          health_scores: {
+            overall_score: 67,
+            dimensions: {
+              emergency_fund: 40,
+              insurance_coverage: 30,
+              investment_diversification: 75,
+              debt_health: 55,
+              tax_efficiency: 60,
+              retirement_readiness: 70,
+            },
+          },
+        },
       }));
       setIsCalculating(false);
     }, 2000);
@@ -55,8 +76,8 @@ export default function HealthScoreSection({ data, setData }: Props) {
         <p className="text-slate-400 max-w-md mx-auto mb-8">
           Ensure you have uploaded your documents and populated your profile goals. When ready, trigger the AI calculation.
         </p>
-        <button 
-          onClick={calculateScore} 
+        <button
+          onClick={calculateScore}
           disabled={isCalculating}
           className={`px-8 py-4 rounded-xl font-bold text-white shadow-lg transition-all ${
             isCalculating ? 'bg-indigo-500/50 cursor-not-allowed animate-pulse' : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 hover:shadow-indigo-500/25'
@@ -67,12 +88,14 @@ export default function HealthScoreSection({ data, setData }: Props) {
     );
   }
 
+  const label = scoreRaw >= 80 ? 'Excellent' : scoreRaw >= 60 ? 'Good — but can improve' : scoreRaw >= 40 ? 'Needs Attention' : 'Critical';
+
   return (
     <div className="animate-fadeIn">
       <div className="glass rounded-xl p-8 text-center mb-6">
         <h2 className="text-2xl font-bold text-white mb-6">Financial Health Score</h2>
         <CircularGauge score={scoreRaw} />
-        <p className="text-lg font-medium text-yellow-400">Good — but can improve</p>
+        <p className={`text-lg font-medium ${scoreRaw >= 75 ? 'text-green-400' : scoreRaw >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>{label}</p>
         <p className="text-sm text-slate-400 mt-1">Based on 6 financial health dimensions</p>
       </div>
 
@@ -81,12 +104,10 @@ export default function HealthScoreSection({ data, setData }: Props) {
           const color = d.score >= 75 ? 'green' : d.score >= 50 ? 'yellow' : 'red';
           const barColor = color === 'green' ? 'from-green-500 to-emerald-400' : color === 'yellow' ? 'from-yellow-500 to-amber-400' : 'from-red-500 to-rose-400';
           const textColor = color === 'green' ? 'text-green-400' : color === 'yellow' ? 'text-yellow-400' : 'text-red-400';
-          const emoji = color === 'green' ? '🟢' : color === 'yellow' ? '🟡' : '🔴';
           return (
             <div key={i} className="glass rounded-xl p-5 card-hover" style={{ animationDelay: `${i * 100}ms` }}>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-white text-sm">{d.name}</h4>
-                <span className="text-lg">{emoji}</span>
               </div>
               <div className="flex items-baseline gap-1 mb-3">
                 <span className={`text-2xl font-bold ${textColor}`}>{d.score}</span>
@@ -95,7 +116,7 @@ export default function HealthScoreSection({ data, setData }: Props) {
               <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-3">
                 <div className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-1000`} style={{ width: `${d.score}%` }}></div>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">💡 {d.fix}</p>
+              <p className="text-xs text-slate-400 leading-relaxed">{d.fix}</p>
             </div>
           );
         })}

@@ -13,8 +13,8 @@ export default function PortfolioSection({ data }: { data: UserData }) {
     );
   }
 
-  const total = data.assets_portfolio.reduce((s, a) => s + a.current_value, 0);
-  const chartData = data.assets_portfolio.map(a => ({ name: a.asset_name.split(' ').slice(0, 2).join(' '), value: a.current_value }));
+  const total = data.assets_portfolio.reduce((s, a) => s + a.current_market_value, 0);
+  const chartData = data.assets_portfolio.map(a => ({ name: a.asset_name.split(' ').slice(0, 2).join(' '), value: a.current_market_value }));
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -37,13 +37,13 @@ export default function PortfolioSection({ data }: { data: UserData }) {
                 <td className="py-3 px-4">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     a.category === 'Equity' ? 'bg-orange-500/20 text-orange-400' :
-                    a.category === 'Commodity' ? 'bg-blue-500/20 text-blue-400' :
+                    a.category === 'Commodity' || a.category === 'Cash' ? 'bg-blue-500/20 text-blue-400' :
                     'bg-green-500/20 text-green-400'
                   }`}>{a.category}</span>
                 </td>
-                <td className="py-3 px-4 text-right text-white">{formatINR(a.current_value)}</td>
+                <td className="py-3 px-4 text-right text-white">{formatINR(a.current_market_value)}</td>
                 <td className="py-3 px-4 text-right text-slate-300">{a.monthly_sip > 0 ? formatINR(a.monthly_sip) : '—'}</td>
-                <td className="py-3 px-4 text-right text-white font-medium">{Math.round((a.current_value / total) * 100)}%</td>
+                <td className="py-3 px-4 text-right text-white font-medium">{Math.round((a.current_market_value / total) * 100)}%</td>
               </tr>
             ))}
           </tbody>
