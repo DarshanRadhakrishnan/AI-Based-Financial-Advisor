@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import {
   LayoutDashboard, Heart, BarChart3, Zap, FlaskConical,
   Map, Bell, LogOut, TrendingUp, Menu, Folder
 } from 'lucide-react';
 import { defaultUserData, UserData } from './data';
+import { supabase } from './lib/supabase';
 import LoginPage from './LoginPage';
 import DashboardSection from './DashboardSection';
 import HealthScoreSection from './HealthScoreSection';
@@ -27,15 +28,68 @@ const navItems = [
 ];
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState('User');
+  const [userEmail, setUserEmail] = useState('user@financeiq.com');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [data, setData] = useState<UserData>(defaultUserData);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  if (!loggedIn) return (
+  // Listen for auth state changes (handles OAuth redirects & session persistence)
+  useEffect(() => {
+    // Get the current session on mount
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      if (currentSession?.user) {
+        setUserName(currentSession.user.user_metadata?.full_name || 'User');
+        setUserEmail(currentSession.user.email || 'user@financeiq.com');
+      }
+      setLoading(false);
+    });
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      if (newSession?.user) {
+        setUserName(newSession.user.user_metadata?.full_name || newSession.user.user_metadata?.name || 'User');
+        setUserEmail(newSession.user.email || 'user@financeiq.com');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setActiveTab('dashboard');
+  };
+
+  const handleLogin = (name: string, email: string) => {
+    setUserName(name);
+    setUserEmail(email);
+    // Session will be picked up by onAuthStateChange
+  };
+
+  // Loading spinner while checking session
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0F172A' }}>
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 mb-4 shadow-lg animate-pulse-glow">
+            <TrendingUp className="w-8 h-8 text-white" />
+          </div>
+          <div className="w-8 h-8 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin mx-auto mt-4"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) return (
     <>
       <Toaster position="top-right" toastOptions={{ className: 'toast-custom', duration: 3000 }} />
-      <LoginPage onLogin={() => setLoggedIn(true)} />
+      <LoginPage onLogin={handleLogin} />
     </>
   );
 
@@ -98,12 +152,14 @@ export default function App() {
         {/* User */}
         <div className="p-4 border-t border-white/5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">U</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">User</p>
-              <p className="text-xs text-slate-500 truncate">user@financeiq.com</p>
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
+              {userName.charAt(0).toUpperCase()}
             </div>
-            <button onClick={() => setLoggedIn(false)} className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer" title="Logout">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{userName}</p>
+              <p className="text-xs text-slate-500 truncate">{userEmail}</p>
+            </div>
+            <button onClick={handleLogout} className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer" title="Logout">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
