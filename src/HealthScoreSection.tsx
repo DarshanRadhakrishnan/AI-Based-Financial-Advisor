@@ -1,4 +1,11 @@
-import { healthDimensions } from './data';
+import { useState } from 'react';
+import { healthDimensions, UserData } from './data';
+import { Activity } from 'lucide-react';
+
+interface Props {
+  data: UserData;
+  setData: React.Dispatch<React.SetStateAction<UserData>>;
+}
 
 function CircularGauge({ score }: { score: number }) {
   const r = 70, circ = 2 * Math.PI * r;
@@ -20,13 +27,51 @@ function CircularGauge({ score }: { score: number }) {
   );
 }
 
-export default function HealthScoreSection() {
-  const overallScore = 67;
+export default function HealthScoreSection({ data, setData }: Props) {
+  const [isCalculating, setIsCalculating] = useState(false);
+  const scoreRaw = data.system_state.current_health_score;
+
+  const calculateScore = () => {
+    setIsCalculating(true);
+    setTimeout(() => {
+      setData(prev => ({
+        ...prev,
+        system_state: {
+          ...prev.system_state,
+          current_health_score: 67
+        }
+      }));
+      setIsCalculating(false);
+    }, 2000);
+  };
+
+  if (scoreRaw === null) {
+    return (
+      <div className="animate-fadeIn flex flex-col items-center justify-center p-12 text-center bg-slate-800/50 rounded-2xl border border-white/5">
+        <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mb-6">
+          <Activity className="w-10 h-10 text-indigo-400" />
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-3">Health Score Pending</h2>
+        <p className="text-slate-400 max-w-md mx-auto mb-8">
+          Ensure you have uploaded your documents and populated your profile goals. When ready, trigger the AI calculation.
+        </p>
+        <button 
+          onClick={calculateScore} 
+          disabled={isCalculating}
+          className={`px-8 py-4 rounded-xl font-bold text-white shadow-lg transition-all ${
+            isCalculating ? 'bg-indigo-500/50 cursor-not-allowed animate-pulse' : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 hover:shadow-indigo-500/25'
+          }`}>
+          {isCalculating ? 'Processing Analysis...' : 'Calculate Money Health Score'}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fadeIn">
       <div className="glass rounded-xl p-8 text-center mb-6">
         <h2 className="text-2xl font-bold text-white mb-6">Financial Health Score</h2>
-        <CircularGauge score={overallScore} />
+        <CircularGauge score={scoreRaw} />
         <p className="text-lg font-medium text-yellow-400">Good — but can improve</p>
         <p className="text-sm text-slate-400 mt-1">Based on 6 financial health dimensions</p>
       </div>

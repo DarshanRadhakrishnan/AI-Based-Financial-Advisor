@@ -2,22 +2,33 @@ export const defaultUserData = {
   user_id: "usr_new",
   last_updated: new Date().toISOString(),
   personal_info: {
+    dob: '',
     current_age: 0,
     target_retirement_age: 0,
     dependents: 0,
     risk_appetite_score: 0,
+    employment_type: '',
+    industry_sector: '',
+    tax_regime: 'Old',
   },
   monthly_cash_flow: {
     net_take_home_income: 0,
     mandatory_living_expenses: 0,
+    monthly_discretionary_spend: 0,
     total_emi_payments: 0,
     current_active_sips: 0,
   },
   assets_portfolio: [] as Array<{ asset_name: string; ticker: string; category: string; current_value: number; monthly_sip: number }>,
+  other_assets: {
+    ppf_balance: 0,
+    gold_value: 0,
+    real_estate_value: 0,
+  },
   liabilities_and_protection: {
     total_outstanding_debt: 0,
     health_insurance_cover: 0,
     term_life_cover: 0,
+    corporate_health_cover: 0,
   },
   financial_goals: [] as Array<{ goal_id: string; goal_name: string; target_amount: number; target_year: number; priority: string; status: string }>,
   system_state: {
@@ -33,13 +44,14 @@ export const fakeProfiles: UserData[] = [
   { // Profile 0: High Income, Conservative (Derived from provided JSON)
     user_id: "usr_wewin_003",
     last_updated: "2024-10-24T10:00:00Z",
-    personal_info: { current_age: 52, target_retirement_age: 60, dependents: 3, risk_appetite_score: 3 },
-    monthly_cash_flow: { net_take_home_income: 150000, mandatory_living_expenses: 50000, total_emi_payments: 30000, current_active_sips: 15000 },
+    personal_info: { dob: '1972-06-15', current_age: 52, target_retirement_age: 60, dependents: 3, risk_appetite_score: 3, employment_type: 'Salaried', industry_sector: 'Public Sector / Government', tax_regime: 'Old' },
+    monthly_cash_flow: { net_take_home_income: 150000, mandatory_living_expenses: 50000, monthly_discretionary_spend: 30000, total_emi_payments: 30000, current_active_sips: 15000 },
     assets_portfolio: [
       { asset_name: "Public Provident Fund", ticker: "NONE", category: "Debt", current_value: 2500000, monthly_sip: 12500 },
       { asset_name: "SBI Bluechip Fund", ticker: "SBIBLUE", category: "Equity", current_value: 800000, monthly_sip: 2500 },
     ],
-    liabilities_and_protection: { total_outstanding_debt: 800000, health_insurance_cover: 2000000, term_life_cover: 10000000 },
+    other_assets: { ppf_balance: 2500000, gold_value: 0, real_estate_value: 5000000 },
+    liabilities_and_protection: { total_outstanding_debt: 800000, health_insurance_cover: 1000000, term_life_cover: 10000000, corporate_health_cover: 1000000 },
     financial_goals: [
       { goal_id: "g_301", goal_name: "Daughter's Education", target_amount: 2000000, target_year: 2027, priority: "Critical", status: "In Progress" },
       { goal_id: "g_302", goal_name: "Retirement Corpus", target_amount: 15000000, target_year: 2032, priority: "High", status: "In Progress" },
@@ -49,13 +61,14 @@ export const fakeProfiles: UserData[] = [
   { // Profile 1: Young, Aggressive
     user_id: "usr_young_001",
     last_updated: "2024-10-25T10:00:00Z",
-    personal_info: { current_age: 26, target_retirement_age: 40, dependents: 0, risk_appetite_score: 9 },
-    monthly_cash_flow: { net_take_home_income: 80000, mandatory_living_expenses: 25000, total_emi_payments: 0, current_active_sips: 30000 },
+    personal_info: { dob: '1998-04-10', current_age: 26, target_retirement_age: 40, dependents: 0, risk_appetite_score: 9, employment_type: 'Self-Employed/Freelance', industry_sector: 'Creative & Design', tax_regime: 'New' },
+    monthly_cash_flow: { net_take_home_income: 80000, mandatory_living_expenses: 25000, monthly_discretionary_spend: 20000, total_emi_payments: 0, current_active_sips: 30000 },
     assets_portfolio: [
       { asset_name: "Nifty 50 Index Fund", ticker: "^NSEI", category: "Equity", current_value: 400000, monthly_sip: 20000 },
       { asset_name: "Bitcoin", ticker: "BTC", category: "Commodity", current_value: 150000, monthly_sip: 10000 }
     ],
-    liabilities_and_protection: { total_outstanding_debt: 0, health_insurance_cover: 500000, term_life_cover: 0 },
+    other_assets: { ppf_balance: 0, gold_value: 50000, real_estate_value: 0 },
+    liabilities_and_protection: { total_outstanding_debt: 0, health_insurance_cover: 300000, term_life_cover: 0, corporate_health_cover: 0 },
     financial_goals: [
       { goal_id: "g_101", goal_name: "Travel Europe", target_amount: 300000, target_year: 2025, priority: "Medium", status: "In Progress" },
       { goal_id: "g_102", goal_name: "House Downpayment", target_amount: 2000000, target_year: 2030, priority: "High", status: "Not Started" }
@@ -65,14 +78,15 @@ export const fakeProfiles: UserData[] = [
   { // Profile 2: Balanced mid-career
     user_id: "usr_mid_002",
     last_updated: "2024-10-26T10:00:00Z",
-    personal_info: { current_age: 35, target_retirement_age: 55, dependents: 2, risk_appetite_score: 6 },
-    monthly_cash_flow: { net_take_home_income: 120000, mandatory_living_expenses: 60000, total_emi_payments: 20000, current_active_sips: 20000 },
+    personal_info: { dob: '1989-11-20', current_age: 35, target_retirement_age: 55, dependents: 2, risk_appetite_score: 6, employment_type: 'Salaried', industry_sector: 'IT & Technology', tax_regime: 'Old' },
+    monthly_cash_flow: { net_take_home_income: 120000, mandatory_living_expenses: 60000, monthly_discretionary_spend: 20000, total_emi_payments: 20000, current_active_sips: 20000 },
     assets_portfolio: [
       { asset_name: "HDFC Mutual Fund", ticker: "HDFCMF", category: "Equity", current_value: 1200000, monthly_sip: 15000 },
       { asset_name: "Physical Gold", ticker: "GOLD", category: "Commodity", current_value: 300000, monthly_sip: 0 },
       { asset_name: "FDs and Bonds", ticker: "NONE", category: "Debt", current_value: 500000, monthly_sip: 5000 }
     ],
-    liabilities_and_protection: { total_outstanding_debt: 1500000, health_insurance_cover: 1000000, term_life_cover: 5000000 },
+    other_assets: { ppf_balance: 1000000, gold_value: 300000, real_estate_value: 2000000 },
+    liabilities_and_protection: { total_outstanding_debt: 1500000, health_insurance_cover: 1000000, term_life_cover: 5000000, corporate_health_cover: 500000 },
     financial_goals: [
       { goal_id: "g_201", goal_name: "Emergency Fund", target_amount: 500000, target_year: 2024, priority: "Critical", status: "In Progress" },
       { goal_id: "g_202", goal_name: "Child's College", target_amount: 5000000, target_year: 2040, priority: "High", status: "Not Started" }
