@@ -24,6 +24,9 @@
 
 from __future__ import annotations
 
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
+import json
 import logging
 import os
 from datetime import datetime, timezone
@@ -40,9 +43,22 @@ from models import (
     GeminiAdvisoryResponse,
     ChatRequest,
     ChatResponse,
+    StartMonitoringRequest,
+    MarketEventRequest,
+    UserMarketStateResponse,
+    AdminMarketCrashRequest,
+    AdminLifeEventRequest,
 )
 from scoring_engine import run_health_score_from_json
 from gemini_service import generate_advisory, generate_chat_response
+from market_monitor import (
+    register_user_tickers,
+    immediate_fetch_for_user,
+    unregister_user,
+    get_user_market_state,
+    start_market_poller,
+    god_mode_trigger,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION
@@ -72,6 +88,13 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Mount the macro events router
+from macro_events import router as macro_events_router, set_admin_queue as set_macro_admin_queue
+app.include_router(macro_events_router)
+
+# Import market monitor queue setter
+from market_monitor import set_market_admin_queue
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CORS MIDDLEWARE
@@ -314,7 +337,186 @@ async def chat_interaction(payload: ChatRequest):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# STARTUP LOG
+# ENDPOINT 4: START MONITORING (Register User Assets)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post(
+    "/api/v1/start-monitoring",
+    tags=["Market Monitor"],
+    summary="Register a user's portfolio assets for real-time monitoring",
+    description=(
+        "Extracts valid tickers from the user's assets_portfolio and begins "
+        "tracking them in real-time. Non-tradable assets (ticker=NONE) are skipped."
+    ),
+)
+async def start_monitoring(payload: StartMonitoringRequest):
+    """POST /api/v1/start-monitoring"""
+    try:
+        result = register_user_tickers(payload.user_id, payload.assets_portfolio)
+        logger.info(
+            f"[MONITOR] Registered {result['count']} tickers for {payload.user_id}"
+        )
+        # Fetch prices immediately so the UI doesn't wait 60s
+        await immediate_fetch_for_user(payload.user_id)
+        return JSONResponse(content={"status": "registered", **result})
+    except Exception as e:
+        logger.error(f"[MONITOR] Registration error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Registration error: {str(e)}",
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT 5: PER-USER MARKET STATE
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get(
+    "/api/v1/market-state/{user_id}",
+    tags=["Market Monitor"],
+    summary="Get market state for a specific user",
+    description="Returns the real-time monitoring state for all tickers registered to a user.",
+)
+async def get_market_state_for_user(user_id: str):
+    """GET /api/v1/market-state/{user_id}"""
+    state = get_user_market_state(user_id)
+    return JSONResponse(content=state)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT 6: STOP MONITORING (Unregister on logout)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post(
+    "/api/v1/stop-monitoring/{user_id}",
+    tags=["Market Monitor"],
+    summary="Unregister a user from market monitoring",
+)
+async def stop_monitoring(user_id: str):
+    """POST /api/v1/stop-monitoring/{user_id}"""
+    unregister_user(user_id)
+    return JSONResponse(content={"status": "unregistered", "user_id": user_id})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINT 7: GOD MODE — SIMULATE MARKET EVENT (Per-User)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post(
+    "/api/trigger-market-event",
+    tags=["Market Monitor", "God Mode"],
+    summary="God Mode: Simulate a market event on a specific user's asset",
+    description=(
+        "Overwrites the percentage_change for a specific ticker in a user's "
+        "watcher and forces threshold evaluation + auto path recalculation."
+    ),
+)
+async def trigger_market_event(payload: MarketEventRequest):
+    """
+    POST /api/trigger-market-event
+    Body: { "user_id": "usr_wewin_001", "ticker": "^NSEI", "simulated_drop": -6.5 }
+    """
+    try:
+        logger.warning(
+            f"[GOD MODE] User: {payload.user_id} | Ticker: {payload.ticker} | "
+            f"Drop: {payload.simulated_drop}"
+        )
+        result = await god_mode_trigger(
+            user_id=payload.user_id,
+            ticker=payload.ticker,
+            simulated_drop=payload.simulated_drop,
+        )
+        return JSONResponse(
+            content={
+                "status": "triggered",
+                "user_id": payload.user_id,
+                "ticker": payload.ticker,
+                "simulated_drop": payload.simulated_drop,
+                "xai_result": result,
+            }
+        )
+    except Exception as e:
+        logger.error(f"[GOD MODE] Error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"God Mode error: {str(e)}",
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADMIN TRIGGER ENDPOINTS (Polling Hack)
+# ─────────────────────────────────────────────────────────────────────────────
+
+from collections import defaultdict
+admin_events_queue: dict[str, list] = defaultdict(list)
+
+# Inject the queue into macro_events and market_monitor modules
+set_macro_admin_queue(admin_events_queue)
+set_market_admin_queue(admin_events_queue)
+
+@app.post(
+    "/api/v1/market/god-mode",
+    tags=["Admin (Demo Tricks)"],
+    summary="Trigger God Mode for Market Monitor",
+    description="Force a specific percentage drop on a ticker to test real-time thresholds.",
+)
+async def trigger_god_mode(req: dict):
+    from market_monitor import god_mode_trigger
+    user_id = req.get("user_id")
+    ticker = req.get("ticker", "^NSEI")
+    simulated_drop = req.get("simulated_drop", -6.0)
+    
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+        
+    result = await god_mode_trigger(user_id, ticker, simulated_drop)
+    return {"status": "success", "triggered": result}
+
+@app.post(
+    "/api/v1/admin/simulate-market-crash",
+    tags=["Admin (Demo Tricks)"],
+    summary="Simulate Market Crash on Frontend",
+    description="Pushes a simulate-market-crash event to the frontend via the polling hack.",
+)
+async def admin_simulate_market_crash(payload: AdminMarketCrashRequest):
+    event = {
+        "type": "simulate-market-crash",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "payload": payload.dict()
+    }
+    admin_events_queue[payload.user_id].append(event)
+    return {"status": "queued", "event": event}
+
+
+@app.post(
+    "/api/v1/admin/log-life-event",
+    tags=["Admin (Demo Tricks)"],
+    summary="Log Life Event on Frontend",
+    description="Pushes a log-life-event to the frontend via the polling hack.",
+)
+async def admin_log_life_event(payload: AdminLifeEventRequest):
+    event = {
+        "type": "log-life-event",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "payload": payload.dict()
+    }
+    admin_events_queue[payload.user_id].append(event)
+    return {"status": "queued", "event": event}
+
+
+@app.get(
+    "/api/v1/admin/poll-events/{user_id}",
+    tags=["Admin (Demo Tricks)"],
+    summary="Frontend Poller for Admin Events",
+    description="The React frontend silently polls this endpoint every 3 seconds to retrieve and execute hijacked commands.",
+)
+async def admin_poll_events(user_id: str):
+    # Pop all events so they aren't executed twice
+    events = admin_events_queue.pop(user_id, [])
+    return {"events": events}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STARTUP LOG + MARKET POLLER
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -326,4 +528,9 @@ async def startup_log():
     logger.info(f"  GEMINI_API_KEY: {gemini_status}")
     logger.info(f"  CORS Origins: {ALLOWED_ORIGINS}")
     logger.info(f"  Docs: http://localhost:8000/docs")
+    logger.info(f"  Market Monitor: ENABLED (per-user, 60s interval)")
     logger.info("=" * 64)
+
+    # Launch the market poller as a background task
+    import asyncio
+    asyncio.create_task(start_market_poller())

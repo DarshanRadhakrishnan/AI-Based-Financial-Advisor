@@ -358,15 +358,188 @@ function ComparisonTable({ paths, selectedId }: { paths: PathResult[]; selectedI
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PATH RECALC EVENT TYPES (from App.tsx)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface PathRecalcGoal {
+  goal_name: string;
+  monthly_allocation: number;
+  success_rate: number;
+}
+
+interface PathRecalcSnapshot {
+  monthlySurplus: number;
+  goalBuckets: PathRecalcGoal[];
+  retirementAge: number;
+}
+
+interface PathRecalcEvent {
+  id: string;
+  triggerType: string;
+  triggerTitle: string;
+  timestamp: string;
+  before: PathRecalcSnapshot;
+  after: PathRecalcSnapshot;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT IMPACT SUMMARY CARD
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EventImpactSummary({ events }: { events: PathRecalcEvent[] }) {
+  if (events.length === 0) return null;
+
+  return (
+    <div className="space-y-4 mb-8 animate-fadeIn">
+      {events.map((evt) => {
+        const surplusDelta = evt.after.monthlySurplus - evt.before.monthlySurplus;
+        const retireDelta = evt.after.retirementAge - evt.before.retirementAge;
+        const isBad = surplusDelta < 0;
+
+        return (
+          <div
+            key={evt.id}
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(17, 38, 73, 0.8)',
+              backdropFilter: 'blur(12px)',
+              border: isBad ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(34, 197, 94, 0.3)',
+              boxShadow: isBad ? '0 0 30px rgba(239, 68, 68, 0.1)' : '0 0 30px rgba(34, 197, 94, 0.1)',
+            }}
+          >
+            {/* Top accent */}
+            <div className="h-1" style={{ background: isBad ? '#EF4444' : '#22C55E' }} />
+
+            <div className="p-5">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-4">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-sm"
+                  style={{ background: isBad ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)' }}
+                >
+                  🔄
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isBad ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+                      Path Recalculated
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {new Date(evt.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-white mt-0.5">
+                    Triggered by: {evt.triggerTitle}
+                  </p>
+                </div>
+              </div>
+
+              {/* Impact Summary Grid */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {/* Surplus */}
+                <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Monthly Surplus</p>
+                  <p className="text-lg font-bold text-white mt-0.5">
+                    ₹{evt.after.monthlySurplus.toLocaleString('en-IN')}
+                  </p>
+                  {surplusDelta !== 0 && (
+                    <p className={`text-xs font-semibold mt-0.5 ${surplusDelta < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      {surplusDelta < 0 ? '' : '+'}₹{surplusDelta.toLocaleString('en-IN')}/mo
+                    </p>
+                  )}
+                </div>
+
+                {/* Retirement */}
+                <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Retire By Age</p>
+                  <p className="text-lg font-bold text-white mt-0.5">
+                    {evt.after.retirementAge}
+                  </p>
+                  {retireDelta !== 0 && (
+                    <p className={`text-xs font-semibold mt-0.5 ${retireDelta > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      {retireDelta > 0 ? '+' : ''}{retireDelta} year{Math.abs(retireDelta) !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+
+                {/* Goals Affected */}
+                <div className="p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Goals Affected</p>
+                  <p className="text-lg font-bold text-white mt-0.5">
+                    {evt.after.goalBuckets.filter((g, i) => {
+                      const before = evt.before.goalBuckets[i];
+                      return before && (g.success_rate !== before.success_rate || g.monthly_allocation !== before.monthly_allocation);
+                    }).length}/{evt.after.goalBuckets.length}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">goals impacted</p>
+                </div>
+              </div>
+
+              {/* Per-Goal Before/After Table */}
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                      <th className="text-left p-2.5 text-slate-500 font-medium uppercase tracking-wider">Goal</th>
+                      <th className="text-center p-2.5 text-slate-500 font-medium uppercase tracking-wider">SIP Before</th>
+                      <th className="text-center p-2.5 text-slate-500 font-medium uppercase tracking-wider">SIP After</th>
+                      <th className="text-center p-2.5 text-slate-500 font-medium uppercase tracking-wider">Success Before</th>
+                      <th className="text-center p-2.5 text-slate-500 font-medium uppercase tracking-wider">Success After</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {evt.after.goalBuckets.map((goal, i) => {
+                      const before = evt.before.goalBuckets[i];
+                      if (!before) return null;
+                      const sipDelta = goal.monthly_allocation - before.monthly_allocation;
+                      const successDelta = goal.success_rate - before.success_rate;
+                      return (
+                        <tr key={goal.goal_name} className="border-t border-white/5">
+                          <td className="p-2.5 text-white font-medium">{goal.goal_name}</td>
+                          <td className="p-2.5 text-center text-slate-400">₹{before.monthly_allocation.toLocaleString('en-IN')}</td>
+                          <td className="p-2.5 text-center">
+                            <span className="text-white font-semibold">₹{goal.monthly_allocation.toLocaleString('en-IN')}</span>
+                            {sipDelta !== 0 && (
+                              <span className={`ml-1 text-[10px] ${sipDelta < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                ({sipDelta < 0 ? '' : '+'}{sipDelta.toLocaleString('en-IN')})
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2.5 text-center text-slate-400">{before.success_rate}%</td>
+                          <td className="p-2.5 text-center">
+                            <span className="text-white font-semibold">{goal.success_rate}%</span>
+                            {successDelta !== 0 && (
+                              <span className={`ml-1 text-[10px] ${successDelta < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                ({successDelta < 0 ? '' : '+'}{successDelta}%)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function PathPlanningSection({
   data,
   setData,
+  pathRecalcEvents = [],
 }: {
   data: UserData;
   setData: React.Dispatch<React.SetStateAction<UserData>>;
+  pathRecalcEvents?: PathRecalcEvent[];
 }) {
   const selectedPathId = data.system_state.path_planning.active_path_selected;
 
@@ -423,6 +596,9 @@ export default function PathPlanningSection({
   if (selectedPathId && selectedPathObj) {
     return (
       <div className="space-y-12">
+        {/* Event Impact Summary — shows when a macro/market event recalculated paths */}
+        <EventImpactSummary events={pathRecalcEvents} />
+
         <ActionPlanView 
            selectedPath={selectedPathObj} 
            result={result} 
@@ -454,6 +630,9 @@ export default function PathPlanningSection({
   // Otherwise, return standard Strategy Selection view 
   return (
     <div className="animate-fadeIn space-y-8">
+      {/* Event Impact Summary — shows when a macro/market event recalculated paths */}
+      <EventImpactSummary events={pathRecalcEvents} />
+
       {/* Section Header */}
       <div>
         <h2 className="text-2xl font-bold text-white mb-1">Your Personalised Investment Paths</h2>

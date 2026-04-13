@@ -218,6 +218,47 @@ export async function saveUserData(data: UserData): Promise<{success: boolean; e
       if (insGoalsErr) throw insGoalsErr;
     }
 
+    console.log("Saving assets_portfolio...");
+    const { error: delAssetsErr } = await supabase.from('assets_portfolio').delete().eq('user_id', data.user_id);
+    if (delAssetsErr) throw delAssetsErr;
+
+    if (data.assets_portfolio.length > 0) {
+      const { error: insAssetsErr } = await supabase.from('assets_portfolio').insert(
+        data.assets_portfolio.map(a => ({
+          asset_id: a.asset_id,
+          user_id: data.user_id,
+          asset_name: a.asset_name,
+          ticker: a.ticker,
+          category: a.category,
+          current_market_value: a.current_market_value,
+          monthly_sip: a.monthly_sip,
+          liquidity_status: a.liquidity_status,
+          linked_goal_id: a.linked_goal_id,
+        }))
+      );
+      if (insAssetsErr) throw insAssetsErr;
+    }
+
+    console.log("Saving liabilities_debt...");
+    const { error: delDebtErr } = await supabase.from('liabilities_debt').delete().eq('user_id', data.user_id);
+    if (delDebtErr) throw delDebtErr;
+
+    if (data.liabilities_and_debt.length > 0) {
+      const { error: insDebtErr } = await supabase.from('liabilities_debt').insert(
+        data.liabilities_and_debt.map(d => ({
+          debt_id: d.debt_id,
+          user_id: data.user_id,
+          loan_type: d.loan_type,
+          outstanding_amount: d.outstanding_amount,
+          interest_rate: d.interest_rate,
+          emi_amount: d.emi_amount,
+          remaining_tenure_months: d.remaining_tenure_months,
+          is_tax_deductible: d.is_tax_deductible,
+        }))
+      );
+      if (insDebtErr) throw insDebtErr;
+    }
+
     console.log("All saved successfully!");
     return { success: true };
   } catch (err: any) {

@@ -208,3 +208,79 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     error: Optional[str] = None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MARKET MONITORING MODELS (Per-User)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class StartMonitoringRequest(BaseModel):
+    """Register a user's assets for market monitoring."""
+    user_id: str = Field(..., description="The user ID to register")
+    assets_portfolio: List[Dict] = Field(
+        ...,
+        description="The user's assets_portfolio array containing ticker fields",
+    )
+
+
+class MarketEventRequest(BaseModel):
+    """God Mode — simulate a market event on a specific ticker for a user."""
+    user_id: str = Field(
+        default="usr_wewin_001",
+        description="Target user ID",
+    )
+    ticker: str = Field(
+        default="^NSEI",
+        description="The yfinance ticker symbol to simulate the event on",
+    )
+    simulated_drop: float = Field(
+        ...,
+        description="Simulated percentage change (e.g. -6.5 for crash, +4.0 for rally)",
+        examples=[-6.5, -2.5, 3.5],
+    )
+
+
+class TickerStateResponse(BaseModel):
+    """State of a single monitored ticker."""
+    ticker: str
+    ticker_name: str
+    current_price: Optional[float] = None
+    baseline_price: Optional[float] = None
+    percentage_change: float = 0.0
+    last_updated: Optional[str] = None
+    status: str = "WAITING"
+
+
+class PollerMetaResponse(BaseModel):
+    """Global poller metadata."""
+    status: str
+    poll_count: int
+    last_updated: Optional[str] = None
+    last_error: Optional[str] = None
+    total_unique_tickers: int = 0
+
+
+class UserMarketStateResponse(BaseModel):
+    """Per-user market monitoring state."""
+    user_id: str
+    registered: bool
+    tickers: List[str] = Field(default_factory=list)
+    ticker_states: List[TickerStateResponse] = Field(default_factory=list)
+    event_log: List[Dict] = Field(default_factory=list)
+    poller: PollerMetaResponse
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADMIN TRIGGER MODELS (Polling Hack)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AdminMarketCrashRequest(BaseModel):
+    user_id: str = Field(..., description="Target user ID")
+    ticker: str = Field(..., description="Ticker to crash (e.g. ^NSEI)")
+    drop_percent: float = Field(..., description="Percentage to drop by (positive number, e.g. 8.5)")
+
+class AdminLifeEventRequest(BaseModel):
+    user_id: str = Field(..., description="Target user ID")
+    event_type: str = Field(..., description="Event type (e.g. job_loss)")
+    new_income: int = Field(..., description="New income value (e.g. 0)")
+
+

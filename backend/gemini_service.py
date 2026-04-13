@@ -33,8 +33,16 @@ GEMINI_API_URL = (
 
 
 def _get_api_key() -> str | None:
-    """Reads GEMINI_API_KEY from environment."""
+    """Reads GEMINI_API_KEY from environment (used for health score)."""
     return os.getenv("GEMINI_API_KEY")
+
+def _get_chat_api_key() -> str | None:
+    """Reads GEMINI_CHAT_API_KEY from environment (used for chatbot)."""
+    return os.getenv("GEMINI_CHAT_API_KEY") or os.getenv("GEMINI_API_KEY")
+
+def _get_news_api_key() -> str | None:
+    """Reads GEMINI_NEWS_API_KEY from environment (used for news)."""
+    return os.getenv("GEMINI_NEWS_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -174,7 +182,7 @@ async def generate_chat_response(query: str) -> dict:
     """
     Sends a user query to Gemini for the chatbot.
     """
-    api_key = _get_api_key()
+    api_key = _get_chat_api_key()
 
     if not api_key:
         return {
